@@ -1,0 +1,7 @@
+{
+  "name": "estimador-software",
+  "version": "1.0.0",
+  "description": "Estimación de software con COCOMO, COSMIC y Puntos de Función",
+  "scripts": { "test": "node --test test/estimation.test.js" },
+  "license": "MIT"
+}

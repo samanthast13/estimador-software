@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estimador de Software — COCOMO, COSMIC y PF</title>
+  <meta name="description" content="Aplicación web para estimar esfuerzo, tiempo y costo de proyectos de software con COCOMO, COSMIC y Puntos de Función.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">
+        <div>
+          <h1>Estimador de software</h1>
+          <p>TC3005B · Modelos de estimación</p>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Métodos de estimación">
+        <button role="tab" data-tab="cocomo" aria-selected="true">COCOMO</button>
+        <button role="tab" data-tab="cosmic" aria-selected="false">COSMIC</button>
+        <button role="tab" data-tab="fp" aria-selected="false">Puntos de Función</button>
+        <button role="tab" data-tab="compare" aria-selected="false">Comparar</button>
+        <button role="tab" data-tab="exercises" aria-selected="false">Ejercicios de clase</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- ============================== COCOMO ============================== -->
+    <section id="tab-cocomo" class="panel" role="tabpanel">
+      <div class="panel-head">
+        <div>
+          <h2>COCOMO <span class="muted">Constructive Cost Model · Boehm, 1981</span></h2>
+          <p>Calcula esfuerzo, tiempo y personal a partir del tamaño en KLOC.</p>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="cocomo-load-class">Ejemplo de clase (30 KLOC)</button>
+          <button class="btn ghost" id="cocomo-load-project">Proyecto de ejemplo (RoomBook)</button>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="stack">
+          <div class="card">
+            <h3>Proyecto</h3>
+            <label class="field">
+              <span>Nombre del proyecto</span>
+              <input id="c-name" type="text" value="Mi proyecto" maxlength="80">
+            </label>
+
+            <div class="field">
+              <span>Nivel del modelo</span>
+              <div class="seg" id="c-level" role="radiogroup">
+                <button type="button" role="radio" data-v="basic" aria-checked="true">Básico</button>
+                <button type="button" role="radio" data-v="intermediate" aria-checked="false">Intermedio</button>
+              </div>
+              <small id="c-level-help">Usa solo el tamaño en KLOC. Estimación rápida y temprana.</small>
+            </div>
+
+            <div class="field">
+              <span>Modo de desarrollo</span>
+              <div class="modes" id="c-mode" role="radiogroup"></div>
+            </div>
+
+            <div class="row">
+              <label class="field grow">
+                <span>Tamaño (KLOC)</span>
+                <input id="c-kloc" type="number" min="0.1" step="0.1" value="30" inputmode="decimal">
+              </label>
+              <label class="field grow">
+                <span>Costo por persona-mes</span>
+                <input id="c-pmcost" type="number" min="0" step="100" value="25000" inputmode="decimal">
+              </label>
+            </div>
+            <label class="field inline">
+              <span>Moneda</span>
+              <input id="c-currency" type="text" value="MXN" maxlength="4" class="short">
+            </label>
+          </div>
+
+          <div class="card">
+            <h3>Obtener KLOC desde puntos de función</h3>
+            <p class="hint">Si no tienes líneas de código, se pueden aproximar desde los PF con un factor por lenguaje.</p>
+            <div class="row">
+              <label class="field grow">
+                <span>Puntos de función</span>
+                <input id="c-fp" type="number" min="1" step="1" value="100" inputmode="numeric">
+              </label>
+              <label class="field grow">
+                <span>Lenguaje</span>
+                <select id="c-lang"></select>
+              </label>
+            </div>
+            <div class="row between">
+              <output id="c-fp-out" class="muted"></output>
+              <button class="btn" id="c-fp-apply" type="button">Usar este KLOC</button>
+            </div>
+          </div>
+
+          <div class="card" id="c-drivers-card" hidden>
+            <h3>Cost drivers <span class="muted">(intermedio)</span></h3>
+            <p class="hint">15 factores que multiplican el esfuerzo. “Nominal” = 1.00 (sin efecto).</p>
+            <div id="c-drivers"></div>
+            <div class="row between eaf-row">
+              <span>Factor de ajuste (EAF)</span>
+              <strong id="c-eaf">1.00</strong>
+            </div>
+            <button class="btn ghost small" id="c-drivers-reset" type="button">Restablecer a nominal</button>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="card results" aria-live="polite">
+            <h3>Resultado</h3>
+            <div id="c-error" class="error" hidden></div>
+            <div class="kpis" id="c-kpis"></div>
+            <div class="formulas" id="c-formulas"></div>
+            <div class="row end">
+              <button class="btn ghost" id="c-export" type="button">Descargar reporte .md</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Esfuerzo según el tamaño <span class="muted">(por modo)</span></h3>
+            <div id="c-chart" class="chart"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== COSMIC ============================== -->
+    <section id="tab-cosmic" class="panel" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>COSMIC <span class="muted">ISO/IEC 19761</span></h2>
+          <p>Se cuentan los movimientos de datos de cada proceso funcional. Cada movimiento vale 1 CFP.</p>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="s-load-class">Ejemplo: Iniciar sesión</button>
+          <button class="btn ghost" id="s-load-ex2">Ejercicio 2: Registrar calificación</button>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="stack">
+          <div class="legend" id="s-legend"></div>
+          <div id="s-processes" class="stack"></div>
+          <button class="btn" id="s-add-process" type="button">+ Agregar proceso funcional</button>
+        </div>
+        <div class="stack">
+          <div class="card results" aria-live="polite">
+            <h3>Resultado</h3>
+            <div class="kpis" id="s-kpis"></div>
+            <div id="s-bars" class="bars"></div>
+            <div id="s-warnings" class="warnings"></div>
+            <label class="field inline">
+              <span>Horas-persona por CFP</span>
+              <input id="s-hpc" type="number" min="0" step="0.5" value="8" class="short">
+            </label>
+            <div class="row end">
+              <button class="btn ghost" id="s-export" type="button">Descargar reporte .md</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Por proceso</h3>
+            <div id="s-perprocess"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== FP ============================== -->
+    <section id="tab-fp" class="panel" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>Puntos de Función <span class="muted">IFPUG · Albrecht, 1979</span></h2>
+          <p>Mide la funcionalidad que ve el usuario, sin importar el lenguaje. PFA = UFP × VAF.</p>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="f-load-class">Ejemplo de clase (53 PF)</button>
+          <button class="btn ghost" id="f-load-ex3">Ejercicio 3 (76 UFP)</button>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="stack">
+          <div class="card">
+            <h3>1 · Componentes y complejidad</h3>
+            <div class="table-scroll">
+              <table class="fp-table" id="f-table"></table>
+            </div>
+          </div>
+          <div class="card">
+            <h3>2 · Características generales del sistema (0–5)</h3>
+            <p class="hint">0 = sin influencia · 3 = promedio · 5 = influencia fuerte. Suman el TDI (0–70).</p>
+            <div id="f-gsc" class="gsc"></div>
+            <div class="row between eaf-row">
+              <span>TDI</span><strong id="f-tdi">0</strong>
+            </div>
+            <button class="btn ghost small" id="f-gsc-mid" type="button">Poner todas en 3</button>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card results" aria-live="polite">
+            <h3>Resultado</h3>
+            <div class="kpis" id="f-kpis"></div>
+            <div class="formulas" id="f-formulas"></div>
+            <div class="row">
+              <label class="field grow">
+                <span>Horas-persona por PF</span>
+                <input id="f-hpf" type="number" min="0" step="0.5" value="8" inputmode="decimal">
+              </label>
+              <label class="field grow">
+                <span>Lenguaje (para KLOC)</span>
+                <select id="f-lang"></select>
+              </label>
+            </div>
+            <div class="row between">
+              <output id="f-kloc" class="muted"></output>
+              <button class="btn" id="f-to-cocomo" type="button">Enviar a COCOMO →</button>
+            </div>
+            <div class="row end">
+              <button class="btn ghost" id="f-export" type="button">Descargar reporte .md</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== COMPARAR ============================== -->
+    <section id="tab-compare" class="panel" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>Comparar métodos</h2>
+          <p>Resultado de cada calculadora en persona-mes (1 PM = 152 horas).</p>
+        </div>
+      </div>
+      <div class="card">
+        <div id="m-bars" class="bars big"></div>
+        <div class="table-scroll">
+          <table class="plain" id="m-table"></table>
+        </div>
+        <p class="hint">No coinciden porque cada método mide el tamaño distinto: COCOMO usa líneas de código, COSMIC movimientos de datos y PF la funcionalidad percibida.</p>
+      </div>
+      <div class="card">
+        <h3>Cuándo usar cada modelo</h3>
+        <div class="table-scroll">
+          <table class="plain">
+            <thead><tr><th>Modelo</th><th>Basado en</th><th>Unidad</th><th>Mejor fase</th><th>Ventaja</th></tr></thead>
+            <tbody>
+              <tr><td>COCOMO</td><td>Líneas de código (KLOC)</td><td>Persona-mes</td><td>Diseño en adelante</td><td>Simple y rápido, pero requiere conocer o estimar el KLOC.</td></tr>
+              <tr><td>COSMIC</td><td>Movimientos de datos</td><td>CFP</td><td>Desde requisitos</td><td>Independiente del lenguaje; útil en tiempo real y embebidos.</td></tr>
+              <tr><td>Puntos de Función</td><td>Funcionalidad percibida</td><td>PF</td><td>Requisitos / diseño</td><td>Muy usado en contratos y benchmarking de productividad.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== EJERCICIOS ============================== -->
+    <section id="tab-exercises" class="panel" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>Ejercicios de clase</h2>
+          <p>Ejemplos y ejercicios del material de la clase, calculados con la misma lógica de la app.</p>
+        </div>
+      </div>
+      <div id="x-list" class="stack"></div>
+    </section>
+
+  </main>
+
+  <footer class="wrap foot">
+    <p>Constantes: Boehm (1981), IFPUG CPM 4.3.1, ISO/IEC 19761.</p>
+  </footer>
+
+  <script src="js/estimation.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
